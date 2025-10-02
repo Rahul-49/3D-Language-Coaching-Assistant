@@ -8,23 +8,43 @@ const DEBUG_FORCE_MOUTHOPEN = false;
 const DEBUG_PULSE_SECONDS = 3;
 const DEBUG_ROTATE = false;
 
-// --- Rhubarb-aware viseme mapping (A-H, X).
-// These map Rhubarb visemes to multiple possible morph keys.
-// If your model uses different keys (e.g. viseme_AA, viseme_O, etc.),
-// those keys will be used automatically when present in the morph dictionary.
+// --- Rhubarb-aware viseme mapping (A-H, X) - Refined per documentation
+// These map Rhubarb visemes to multiple possible morph keys following
+// the official Hanna-Barbera inspired mouth shape guidelines.
 const VISEME_WEIGHTS = {
-  A: { MouthClose: 1.0, viseme_PP: 1.0 },                 // lips closed
-  B: { mouthSmile: 0.2, mouthOpen: 0.9, viseme_B: 1.0 },  // light open
-  C: { mouthOpen: 0.55, viseme_O: 0.45 },                 // mid open
-  D: { mouthOpen: 1.0, JawOpen: 0.85, viseme_AA: 1.0 },   // full "AAH"
-  E: { mouthOpen: 0.5, viseme_I: 0.6, mouthSmile: 0.3 }, // "EH/EE"
-  F: { mouthSmile: 0.7, viseme_F: 1.0 },                  // "F/V" teeth
-  G: { mouthOpen: 0.85, viseme_O: 2.0, JawOpen: 0.6 },    // strong "O"
-  H: { mouthOpen: 0.4, viseme_U: 0.6, JawOpen: 0.3 },    // strong "U"
-  X: { MouthClose: 1.0 }                                  // silence
+  // A: Closed mouth for P, B, M - slight pressure between lips
+  A: { MouthClose: 0.95, viseme_PP: 1.0, mouthOpen: 0.0 },
+  
+  // B: Slightly open with clenched teeth - for most consonants (K, S, T) and "EE"
+  B: { mouthOpen: 0.35, mouthSmile: 0.45, viseme_I: 0.8, JawOpen: 0.15 },
+  
+  // C: Open mouth for "EH" (men) and "AE" (bat) - also transition A/B→D
+  C: { mouthOpen: 0.6, JawOpen: 0.4, viseme_E: 0.85, mouthSmile: 0.1 },
+  
+  // D: Wide open for "AA" (father) - maximum jaw opening
+  D: { mouthOpen: 1.0, JawOpen: 1.0, viseme_AA: 1.0, mouthSmile: 0.0 },
+  
+  // E: Slightly rounded for "AO" (off) and "ER" (bird) - transition C/D→F
+  E: { mouthOpen: 0.55, JawOpen: 0.35, viseme_O: 0.6, mouthRound: 0.5 },
+  
+  // F: Puckered lips for "UW" (you), "OW" (show), "W" (way)
+  F: { mouthOpen: 0.3, viseme_U: 1.0, mouthRound: 0.9, mouthFunnel: 0.8, JawOpen: 0.2 },
+  
+  // G: Upper teeth on lower lip for "F" (for) and "V" (very)
+  G: { mouthOpen: 0.25, viseme_F: 1.0, mouthSmile: 0.2, JawOpen: 0.1 },
+  
+  // H: Tongue raised behind upper teeth for long "L" - at least as open as C
+  H: { mouthOpen: 0.65, JawOpen: 0.45, viseme_L: 1.0, tongueOut: 0.4 },
+  
+  // X: Idle/rest position - closed but relaxed (less pressure than A)
+  X: { MouthClose: 0.85, mouthOpen: 0.0, viseme_sil: 1.0 }
 };
 
-const ALL_MORPH_KEYS = ["mouthOpen", "mouthSmile", "JawOpen", "MouthClose", "viseme_AA", "viseme_O", "viseme_U", "viseme_I", "viseme_PP"];
+const ALL_MORPH_KEYS = [
+  "mouthOpen", "mouthSmile", "mouthRound", "mouthFunnel", "JawOpen", "MouthClose",
+  "viseme_AA", "viseme_E", "viseme_I", "viseme_O", "viseme_U", 
+  "viseme_PP", "viseme_F", "viseme_L", "viseme_sil", "tongueOut"
+];
 
 function Avatar({ url, visemes, audioRef }) {
   const group = useRef();
@@ -241,13 +261,21 @@ function Avatar({ url, visemes, audioRef }) {
       if (v.start > elapsedTime) { next = { idx: i, cue: v }; break; }
     }
 
-    // Build blended target weights (defaults to X if nothing found)
+    // Build blended target weights with improved co-articulation
     const basePrev = prev?.cue?.value ?? "X";
     const baseNext = next?.cue?.value ?? null;
     let blendT = 0;
+    
+    // Enhanced blending for smoother transitions
     if (prev?.cue && baseNext && next?.cue) {
       const denom = Math.max(0.0001, (next.cue.start - prev.cue.start));
-      blendT = MathUtils.clamp((elapsedTime - prev.cue.start) / denom, 0, 1);
+      const rawT = MathUtils.clamp((elapsedTime - prev.cue.start) / denom, 0, 1);
+      
+      // Use ease-in-out for more natural co-articulation
+      // Emphasize anticipatory movements (blend starts earlier)
+      blendT = rawT < 0.5 
+        ? 2 * rawT * rawT  // ease in (accelerate toward next shape)
+        : 1 - Math.pow(-2 * rawT + 2, 2) / 2; // ease out
     }
 
     // Resolve weight sets and blend them
@@ -272,14 +300,15 @@ function Avatar({ url, visemes, audioRef }) {
       });
     }
 
-    // Non-linear scale to reduce "overdrive" look
+    // Non-linear scale with improved curve for natural movement
     const scaleCurve = (t) => {
       if (t <= 0) return 0;
-      return Math.min(1, Math.pow(t, 1.12)); // gentle nonlinear curve
+      // Slightly softer curve to prevent over-exaggeration
+      return Math.min(1, Math.pow(t, 1.05));
     };
 
-    // optional global gain for visibility (keep conservative)
-    const GAIN = 5.4;
+    // Reduced global gain for more subtle, natural movements
+    const GAIN = 1.8;
 
     // Apply blended weights to *all* morph keys present on each mesh
     meshesRef.current.forEach(mesh => {
@@ -288,28 +317,77 @@ function Avatar({ url, visemes, audioRef }) {
 
       // compute per-key target (if a key isn't in our mapping, it will be decayed to 0)
       Object.entries(dict).forEach(([key, idx]) => {
-        // keys may be named in several ways (JawOpen, mouthOpen, viseme_AA, etc.)
-        // try: direct key (A-H mapping uses names like viseme_AA or MouthClose)
-        // fallback: if key looks like a viseme name (e.g. startsWith('viseme_')), try mapping by suffix
+        // Try direct mapping first from our VISEME_WEIGHTS
         let rawTarget = blendedWeightFor(key);
-        // If blendedWeightFor returned 0 (no explicit mapping), also check for common aliases:
-        if (!rawTarget) {
-          // alias heuristics
+        
+        // If no direct match, use enhanced alias heuristics
+        if (!rawTarget || rawTarget === 0) {
           const alias = key.toLowerCase();
-          if (alias.includes('jaw')) rawTarget = blendedWeightFor('JawOpen');
-          else if (alias.includes('open')) rawTarget = blendedWeightFor('mouthOpen') || blendedWeightFor('JawOpen');
-          else if (alias.includes('close')) rawTarget = blendedWeightFor('MouthClose');
-          else if (/viseme_?a/i.test(alias)) rawTarget = blendedWeightFor('viseme_AA') || blendedWeightFor('A');
-          else if (/viseme_?o/i.test(alias)) rawTarget = blendedWeightFor('viseme_O') || blendedWeightFor('G');
-          else if (/viseme_?u/i.test(alias)) rawTarget = blendedWeightFor('viseme_U') || blendedWeightFor('H');
-          else if (/pp|p/i.test(alias)) rawTarget = blendedWeightFor('viseme_PP') || blendedWeightFor('A');
+          
+          // Jaw movements
+          if (/jaw.*open/i.test(alias) || alias === 'jawopen') {
+            rawTarget = blendedWeightFor('JawOpen');
+          }
+          // Mouth open/close
+          else if (/mouth.*open/i.test(alias) && !/smile|round|funnel/.test(alias)) {
+            rawTarget = blendedWeightFor('mouthOpen');
+          }
+          else if (/mouth.*close/i.test(alias) || alias === 'mouthclose') {
+            rawTarget = blendedWeightFor('MouthClose');
+          }
+          // Mouth shapes
+          else if (/mouth.*smile/i.test(alias) || alias === 'mouthsmile') {
+            rawTarget = blendedWeightFor('mouthSmile');
+          }
+          else if (/mouth.*round/i.test(alias) || alias === 'mouthround') {
+            rawTarget = blendedWeightFor('mouthRound');
+          }
+          else if (/mouth.*funnel/i.test(alias) || alias === 'mouthfunnel') {
+            rawTarget = blendedWeightFor('mouthFunnel');
+          }
+          // Viseme mappings (ARKit/standard naming)
+          else if (/viseme[_\s]?aa/i.test(alias)) {
+            rawTarget = blendedWeightFor('viseme_AA');
+          }
+          else if (/viseme[_\s]?e/i.test(alias) && !/ee/i.test(alias)) {
+            rawTarget = blendedWeightFor('viseme_E');
+          }
+          else if (/viseme[_\s]?i/i.test(alias) || /viseme[_\s]?ee/i.test(alias)) {
+            rawTarget = blendedWeightFor('viseme_I');
+          }
+          else if (/viseme[_\s]?o/i.test(alias) && !/oo/i.test(alias)) {
+            rawTarget = blendedWeightFor('viseme_O');
+          }
+          else if (/viseme[_\s]?u/i.test(alias) || /viseme[_\s]?oo/i.test(alias)) {
+            rawTarget = blendedWeightFor('viseme_U');
+          }
+          else if (/viseme[_\s]?(pp|p)/i.test(alias)) {
+            rawTarget = blendedWeightFor('viseme_PP');
+          }
+          else if (/viseme[_\s]?f/i.test(alias)) {
+            rawTarget = blendedWeightFor('viseme_F');
+          }
+          else if (/viseme[_\s]?l/i.test(alias)) {
+            rawTarget = blendedWeightFor('viseme_L');
+          }
+          else if (/viseme[_\s]?sil/i.test(alias) || /viseme[_\s]?rest/i.test(alias)) {
+            rawTarget = blendedWeightFor('viseme_sil');
+          }
+          // Tongue
+          else if (/tongue/i.test(alias)) {
+            rawTarget = blendedWeightFor('tongueOut');
+          }
         }
 
-        // final scaled target
+        // final scaled target with adaptive lerp speed
         const target = Math.min(1, GAIN * scaleCurve(rawTarget || 0));
-        // lerp faster when active, slower when deactivating
-        const lerpFactor = (rawTarget && rawTarget > 0.01) ? 0.38 : 0.18;
-        infl[idx] = MathUtils.lerp(infl[idx] || 0, target, lerpFactor);
+        
+        // Dynamic lerp: faster attack (opening), slower decay (closing) for natural feel
+        const currentVal = infl[idx] || 0;
+        const isIncreasing = target > currentVal;
+        const lerpFactor = isIncreasing ? 0.45 : 0.25;
+        
+        infl[idx] = MathUtils.lerp(currentVal, target, lerpFactor);
       });
 
       // softly decay any morphs not explicitly handled (safety: ensure no leftover shapes)
@@ -320,10 +398,20 @@ function Avatar({ url, visemes, audioRef }) {
       });
     });
 
-    // subtle jaw / head motion based on blended JawOpen or mouthOpen
-    const jawVal = blendedWeightFor('JawOpen') || blendedWeightFor('mouthOpen') || 0;
+    // Subtle jaw / head motion based on mouth openness
+    // Use a combination of JawOpen and mouthOpen for natural head tilt
+    const jawVal = blendedWeightFor('JawOpen') || 0;
+    const mouthVal = blendedWeightFor('mouthOpen') || 0;
+    const openness = Math.max(jawVal, mouthVal * 0.7);
+    
     if (group.current) {
-      group.current.rotation.x = MathUtils.lerp(group.current.rotation.x, -0.03 * jawVal, 0.08);
+      // Very subtle downward tilt when mouth opens wide
+      const targetRotX = -0.02 * openness;
+      group.current.rotation.x = MathUtils.lerp(
+        group.current.rotation.x, 
+        targetRotX, 
+        0.12
+      );
     }
 
     // If we've gone past the last cue and audio isn't playing, schedule stop
@@ -347,4 +435,3 @@ export default function AvatarScene({ avatarUrl, visemes, audioRef }) {
 }
 
 useGLTF.preload("https://models.readyplayer.me/68d681b0808887d27d794e82.glb");
-

@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 import os
 from datetime import datetime
 from ..db.mongo import get_db
+from ..utils.jwt_auth import require_auth
 from ..services.stt import transcribe_audio
 from ..services.moderation import is_allowed
 from ..services.grammar import analyze_grammar
@@ -15,7 +16,8 @@ check_bp = Blueprint('check', __name__)
 
 
 @check_bp.post('/check')
-def check_answer():
+@require_auth
+def check_answer(current_user):
     # Expected multipart/form-data with fields: session_id, question, audio(optional), transcript(optional)
     session_id = request.form.get('session_id')
     question = request.form.get('question')
@@ -23,6 +25,14 @@ def check_answer():
     audio = request.files.get('audio')
     if not session_id or not question:
         return jsonify({'error': 'session_id and question required'}), 400
+    
+    # Verify session belongs to current user
+    db = get_db()
+    session = db.sessions.find_one({'session_id': session_id})
+    if not session:
+        return jsonify({'error': 'session not found'}), 404
+    if session.get('user_id') != current_user['user_id']:
+        return jsonify({'error': 'unauthorized'}), 403
 
     # STT
     transcript = provided_transcript
@@ -43,7 +53,6 @@ def check_answer():
         sem_score = 0
         pron_score = 0
 
-        db = get_db()
         attempt = {
             'session_id': session_id,
             'question': question,
@@ -98,7 +107,6 @@ def check_answer():
         pron_score = int(os.getenv('STATIC_PRONUNCIATION', '75'))
         mistakes = []
 
-        db = get_db()
         attempt = {
             'session_id': session_id,
             'question': question,
@@ -291,7 +299,6 @@ def check_answer():
     pron_score = pronunciation_score(transcript, correction)
 
     # Save attempt
-    db = get_db()
     attempt = {
         'session_id': session_id,
         'question': question,

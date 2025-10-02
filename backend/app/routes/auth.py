@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from ..db.mongo import get_db
+from ..utils.jwt_auth import create_jwt_token, require_auth
 from werkzeug.security import generate_password_hash, check_password_hash
 import uuid
 from datetime import datetime
@@ -35,14 +36,12 @@ def signup():
         'user_id': user_id,
         'email': email,
         'password_hash': password_hash,
-        'created_at': datetime.utcnow().isoformat() + 'Z',
-        'token': None
+        'created_at': datetime.utcnow().isoformat() + 'Z'
     }
     db.users.insert_one(user)
 
-    # Auto-login after signup
-    token = f"tok_{uuid.uuid4().hex}"
-    db.users.update_one({'user_id': user_id}, {'$set': {'token': token}})
+    # Create JWT token for auto-login after signup
+    token = create_jwt_token(user_id, email)
 
     return jsonify({'token': token, 'user': _public_user(user)})
 
@@ -60,26 +59,16 @@ def login():
     if not user or not check_password_hash(user.get('password_hash', ''), password):
         return jsonify({'error': 'invalid credentials'}), 401
 
-    token = f"tok_{uuid.uuid4().hex}"
-    db.users.update_one({'_id': user['_id']}, {'$set': {'token': token}})
-    user['token'] = token
+    # Create JWT token
+    token = create_jwt_token(user['user_id'], email)
 
     return jsonify({'token': token, 'user': _public_user(user)})
 
 
 @auth_bp.get('/me')
-def me():
-    auth_header = request.headers.get('Authorization') or ''
-    parts = auth_header.split(' ')
-    token = parts[1] if len(parts) == 2 and parts[0].lower() == 'bearer' else None
-    if not token:
-        return jsonify({'error': 'unauthorized'}), 401
-
-    db = get_db()
-    user = db.users.find_one({'token': token})
-    if not user:
-        return jsonify({'error': 'unauthorized'}), 401
-
-    return jsonify({'user': _public_user(user)})
+@require_auth
+def me(current_user):
+    """Get current authenticated user info"""
+    return jsonify({'user': _public_user(current_user)})
 
 

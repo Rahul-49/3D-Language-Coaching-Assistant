@@ -392,6 +392,12 @@ export default function App() {
   const [finalScores, setFinalScores] = useState(null)
   const [visemes, setVisemes] = useState([])
   const audioRef = useRef(null)
+  const [showPerformanceModal, setShowPerformanceModal] = useState(false)
+
+  const handleFinish = (scores) => {
+    setFinalScores(scores)
+    setShowPerformanceModal(true)
+  }
 
   const MainApp = (
     <div className="vh-100 bg-dark text-white position-relative overflow-hidden">
@@ -468,6 +474,103 @@ export default function App() {
           align-items: center;
           justify-content: center;
         }
+        .performance-modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.85);
+          backdrop-filter: blur(10px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 9999;
+          animation: fadeIn 0.3s ease-in-out;
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        .performance-modal {
+          background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(244, 114, 182, 0.15) 100%);
+          backdrop-filter: blur(20px);
+          border: 2px solid rgba(255, 255, 255, 0.2);
+          border-radius: 24px;
+          max-width: 600px;
+          width: 90%;
+          max-height: 90vh;
+          overflow-y: auto;
+          animation: slideUp 0.4s ease-out;
+          position: relative;
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+        .performance-modal::-webkit-scrollbar {
+          display: none;
+        }
+        @keyframes slideUp {
+          from { transform: translateY(50px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+        .confetti {
+          position: fixed;
+          width: 10px;
+          height: 10px;
+          background: #f0f;
+          position: absolute;
+          animation: confetti-fall linear infinite;
+        }
+        @keyframes confetti-fall {
+          to {
+            transform: translateY(100vh) rotate(360deg);
+          }
+        }
+        .confetti:nth-child(1) { left: 10%; animation-duration: 3s; background: #667eea; }
+        .confetti:nth-child(2) { left: 20%; animation-duration: 2.5s; background: #764ba2; animation-delay: 0.2s; }
+        .confetti:nth-child(3) { left: 30%; animation-duration: 2.8s; background: #f093fb; animation-delay: 0.4s; }
+        .confetti:nth-child(4) { left: 40%; animation-duration: 3.2s; background: #f5576c; animation-delay: 0.1s; }
+        .confetti:nth-child(5) { left: 50%; animation-duration: 2.6s; background: #667eea; animation-delay: 0.3s; }
+        .confetti:nth-child(6) { left: 60%; animation-duration: 3.1s; background: #764ba2; animation-delay: 0.5s; }
+        .confetti:nth-child(7) { left: 70%; animation-duration: 2.7s; background: #f093fb; animation-delay: 0.2s; }
+        .confetti:nth-child(8) { left: 80%; animation-duration: 2.9s; background: #f5576c; animation-delay: 0.4s; }
+        .confetti:nth-child(9) { left: 90%; animation-duration: 3.3s; background: #667eea; animation-delay: 0.1s; }
+        .confetti:nth-child(10) { left: 15%; animation-duration: 2.4s; background: #764ba2; animation-delay: 0.6s; }
+        .confetti:nth-child(11) { left: 25%; animation-duration: 3.0s; background: #f093fb; animation-delay: 0.3s; }
+        .confetti:nth-child(12) { left: 35%; animation-duration: 2.8s; background: #f5576c; animation-delay: 0.5s; }
+        .confetti:nth-child(13) { left: 45%; animation-duration: 3.2s; background: #667eea; animation-delay: 0.2s; }
+        .confetti:nth-child(14) { left: 55%; animation-duration: 2.6s; background: #764ba2; animation-delay: 0.4s; }
+        .confetti:nth-child(15) { left: 65%; animation-duration: 2.9s; background: #f093fb; animation-delay: 0.1s; }
+        .confetti:nth-child(16) { left: 75%; animation-duration: 3.1s; background: #f5576c; animation-delay: 0.6s; }
+        .confetti:nth-child(17) { left: 85%; animation-duration: 2.7s; background: #667eea; animation-delay: 0.3s; }
+        .confetti:nth-child(18) { left: 95%; animation-duration: 3.0s; background: #764ba2; animation-delay: 0.5s; }
+        .confetti:nth-child(19) { left: 5%; animation-duration: 2.5s; background: #f093fb; animation-delay: 0.2s; }
+        .confetti:nth-child(20) { left: 50%; animation-duration: 2.8s; background: #f5576c; animation-delay: 0.4s; }
+        .btn-gradient {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          border: none;
+          color: white;
+          font-weight: 600;
+          transition: all 0.3s ease;
+        }
+        .btn-gradient:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 10px 30px rgba(102, 126, 234, 0.5);
+          color: white;
+        }
+        .btn-outline-custom {
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          backdrop-filter: blur(10px);
+          color: white;
+          font-weight: 600;
+          transition: all 0.3s ease;
+        }
+        .btn-outline-custom:hover {
+          background: rgba(255, 255, 255, 0.1);
+          border-color: rgba(255, 255, 255, 0.3);
+          color: white;
+        }
       `}</style>
 
       {/* Floating Background Orbs */}
@@ -508,26 +611,84 @@ export default function App() {
             </div>
 
             {/* Interview Panel */}
-            <div className="glass-panel rounded-3 p-3 mb-3">
-              <InterviewPanel 
-                avatarUrl={avatarUrl} 
-                sessionId={sessionId} 
-                setSessionId={setSessionId} 
-                setFinalScores={setFinalScores} 
-                setVisemes={setVisemes} 
-                audioRef={audioRef} 
-              />
-            </div>
-
-            {/* Score Report */}
-            {finalScores && (
-              <div className="glass-panel rounded-3 p-3">
-                <ScoreReport scores={finalScores} />
+            {!showPerformanceModal && (
+              <div className="glass-panel rounded-3 p-3 mb-3">
+                <InterviewPanel 
+                  avatarUrl={avatarUrl} 
+                  sessionId={sessionId} 
+                  setSessionId={setSessionId} 
+                  setFinalScores={handleFinish} 
+                  setVisemes={setVisemes} 
+                  audioRef={audioRef} 
+                />
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* Performance Modal with Confetti */}
+      {showPerformanceModal && finalScores && (
+        <div className="performance-modal-overlay" onClick={(e) => e.target === e.currentTarget && setShowPerformanceModal(false)}>
+          {/* Confetti */}
+          {[...Array(20)].map((_, i) => (
+            <div key={i} className="confetti" style={{ top: '-10px' }}></div>
+          ))}
+          
+          <div className="performance-modal p-4 p-md-5">
+            <div className="text-center mb-4">
+              <div className="mb-3">
+                <div className="rounded-circle d-inline-flex align-items-center justify-content-center" 
+                     style={{ width: '80px', height: '80px', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' }}>
+                  <i className="bi bi-trophy-fill text-white" style={{ fontSize: '2.5rem' }}></i>
+                </div>
+              </div>
+              <h2 className="fw-bold mb-2">
+                <span style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+                  Interview Complete!
+                </span>
+              </h2>
+              <p className="text-white-50 mb-0">Here's your performance summary</p>
+            </div>
+
+            {/* Score Report */}
+            <div className="mb-4">
+              <ScoreReport scores={finalScores} />
+            </div>
+
+            {/* Action Buttons */}
+            <div className="d-flex flex-wrap gap-3 justify-content-center">
+              <button 
+                className="btn btn-gradient rounded-pill px-4 py-2 d-flex align-items-center gap-2"
+                onClick={() => {
+                  setShowPerformanceModal(false)
+                  setFinalScores(null)
+                  setSessionId('')
+                }}
+              >
+                <i className="bi bi-arrow-clockwise"></i>
+                <span>Start New Session</span>
+              </button>
+              <button 
+                className="btn btn-outline-custom rounded-pill px-4 py-2 d-flex align-items-center gap-2"
+                onClick={() => setShowPerformanceModal(false)}
+              >
+                <i className="bi bi-eye"></i>
+                <span>Review Answers</span>
+              </button>
+            </div>
+
+            {/* Close button */}
+            <button 
+              className="btn btn-link text-white-50 position-absolute top-0 end-0 m-3"
+              onClick={() => setShowPerformanceModal(false)}
+              style={{ textDecoration: 'none', fontSize: '1.5rem' }}
+            >
+              <i className="bi bi-x-lg"></i>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 
