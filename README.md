@@ -12,6 +12,22 @@ A 3D avatar-powered English interview practice application with real-time speech
 - **User Authentication**: Secure login/signup system
 - **Progress Tracking**: Session-based scoring and improvement analytics
 
+## Demo 
+Homepage
+![Home page](screenshot1.png)
+Onboarding
+![Home page](screenshot2.png)
+Avatar
+![Home page](screenshot3.png)
+
+## Video Demo
+## Avatar with lip-sync
+Click on the image to see video
+![Lip-Sync]([screenshot3.png](https://vimeo.com/1123628327?share=copy#t=0))
+
+## Final Scores
+![Home page](final-scores.png)
+
 ## Tech Stack
 
 ### Frontend
