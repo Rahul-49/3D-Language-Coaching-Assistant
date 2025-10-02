@@ -23,7 +23,7 @@ Avatar
 ## Video Demo
 ## Avatar with lip-sync
 Click on the image to see video
-![Lip-Sync]([screenshot3.png](https://vimeo.com/1123628327?share=copy#t=0))
+[![Lip-Sync](screenshot3.png)](https://vimeo.com/1123628327)
 
 ## Final Scores
 ![Home page](final-scores.png)
